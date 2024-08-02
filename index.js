@@ -6,10 +6,11 @@ const NodeCache = require("node-cache");
 const multer = require("multer");
 const FormData = require("form-data");
 
+const MIT_URL = process.env.MIT_URL || "http://127.0.0.1:5004";
+const PORT = process.env.PORT || 3000;
+
 const imageCache = new NodeCache({ stdTTL: 3600 }); // 1 hour
 const requestLimitCache = new NodeCache({ stdTTL: 86400 }); // 1 day
-
-const MIT_URL = "http://127.0.0.1:5004";
 
 const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB limit
@@ -69,7 +70,7 @@ app.post("/submit", upload.single("file"), async (req, res) => {
   const { detector, direction, translator, tgt_lang } = req.body;
 
   const requestCount = requestLimitCache.get(userIp) || 0;
-  if (requestCount >= 5) {
+  if (requestCount >= 10) {
     return res.status(429).send("Daily limit reached");
   }
   // Increment request count
@@ -158,6 +159,6 @@ app.get("/input/:taskId", async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
-  console.log("Proxy server started http://localhost:3000");
+app.listen(PORT, () => {
+  console.log("Proxy server started http://127.0.0.1:3000");
 });
