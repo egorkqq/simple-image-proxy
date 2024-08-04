@@ -32,7 +32,7 @@ app.get("/proxy-image", async (req, res) => {
   const imageUrl = req.query.url;
 
   if (!imageUrl) {
-    return res.status(400).send("URL param is required");
+    return res.status(400).send("The URL parameter is required.");
   }
 
   const cachedImage = imageCache.get(imageUrl);
@@ -61,7 +61,7 @@ app.get("/proxy-image", async (req, res) => {
 
     res.set("Content-Type", "image/jpeg").send(compressedBuffer);
   } catch (err) {
-    res.status(500).send("Cant get image");
+    res.status(500).send("Unable to retrieve the image. Please try again later.");
   }
 });
 
@@ -71,13 +71,13 @@ app.post("/submit", upload.single("file"), async (req, res) => {
 
   const requestCount = requestLimitCache.get(userIp) || 0;
   if (requestCount >= 10) {
-    return res.status(429).send("Daily limit reached");
+    return res.status(429).send("You have reached your daily limit. Please try again tomorrow.");
   }
   // Increment request count
   requestLimitCache.set(userIp, requestCount + 1);
 
   if (!req.file) {
-    return res.status(400).send("File is required");
+    return res.status(400).send("A file is required for submission.");
   }
 
   try {
@@ -98,7 +98,7 @@ app.post("/submit", upload.single("file"), async (req, res) => {
     res.json({ taskId });
   } catch (err) {
     console.log(err);
-    res.status(500).send("Error when submit");
+    res.status(500).send("An error occurred during submission. Please try again later.");
   }
 });
 
@@ -106,7 +106,7 @@ app.get("/task-state", async (req, res) => {
   const taskId = req.query.taskid;
 
   if (!taskId) {
-    return res.status(400).send("taskId is required");
+    return res.status(400).send("The taskId parameter is required.");
   }
 
   try {
@@ -119,7 +119,9 @@ app.get("/task-state", async (req, res) => {
     res.json(response.data);
   } catch (err) {
     console.log(err);
-    res.status(500).send("Error when handling state");
+    res
+      .status(500)
+      .send("An error occurred while retrieving the task state. Please try again later.");
   }
 });
 
@@ -137,7 +139,7 @@ app.get("/result/:taskId", async (req, res) => {
     res.set("Content-Type", contentType).send(body);
   } catch (err) {
     console.log(err);
-    res.status(500).send("Cant get image");
+    res.status(500).send("Unable to retrieve the result image. Please try again later.");
   }
 });
 
@@ -155,7 +157,7 @@ app.get("/input/:taskId", async (req, res) => {
     res.set("Content-Type", contentType).send(body);
   } catch (err) {
     console.log(err);
-    res.status(500).send("Cant get image");
+    res.status(500).send("Unable to retrieve the result image. Please try again later.");
   }
 });
 
