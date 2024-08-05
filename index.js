@@ -1,13 +1,18 @@
 const express = require("express");
 const axios = require("axios");
 const sharp = require("sharp");
-const app = express();
 const NodeCache = require("node-cache");
 const multer = require("multer");
 const FormData = require("form-data");
+require("dotenv").config();
 
-const MIT_URL = process.env.MIT_URL || "http://127.0.0.1:5004";
+const app = express();
+
 const PORT = process.env.PORT || 3000;
+const MIT_BASE = process.env.MIT_BASE || "http://127.0.0.1";
+console.log(process.env);
+const MIT_URLS = [`${MIT_BASE}:5001`, `${MIT_BASE}:5002`, `${MIT_BASE}:5003`, `${MIT_BASE}:5004`];
+let currentServerIndex = 0;
 
 const imageCache = new NodeCache({ stdTTL: 3600 }); // 1 hour
 const requestLimitCache = new NodeCache({ stdTTL: 86400 }); // 1 day
@@ -70,13 +75,15 @@ app.post("/submit", upload.single("file"), async (req, res) => {
   const { detector, direction, translator, tgt_lang } = req.body;
 
   const requestCount = requestLimitCache.get(userIp) || 0;
-  if (requestCount >= 10) {
+  if (requestCount >= 100) {
+    console.log("User reached limit");
     return res.status(429).send("You have reached your daily limit. Please try again tomorrow.");
   }
   // Increment request count
   requestLimitCache.set(userIp, requestCount + 1);
 
   if (!req.file) {
+    console.log("User has no file");
     return res.status(400).send("A file is required for submission.");
   }
 
@@ -89,13 +96,16 @@ app.post("/submit", upload.single("file"), async (req, res) => {
     formData.append("translator", translator);
     formData.append("tgt_lang", tgt_lang);
 
-    const response = await axios.post(`${MIT_URL}/submit`, formData, {
+    currentServerIndex = (currentServerIndex + 1) % MIT_URLS.length;
+    const serverUrl = MIT_URLS[currentServerIndex];
+
+    const response = await axios.post(`${serverUrl}/submit`, formData, {
       headers: formData.getHeaders()
     });
 
     const { task_id: taskId } = response.data;
 
-    res.json({ taskId });
+    res.json({ taskId, s: currentServerIndex });
   } catch (err) {
     console.log(err);
     res.status(500).send("An error occurred during submission. Please try again later.");
@@ -104,17 +114,25 @@ app.post("/submit", upload.single("file"), async (req, res) => {
 
 app.get("/task-state", async (req, res) => {
   const taskId = req.query.taskid;
+  const currentServerIndex = req.query.s;
 
   if (!taskId) {
     return res.status(400).send("The taskId parameter is required.");
   }
 
   try {
-    const response = await axios.get(`${MIT_URL}/task-state`, {
+    const serverUrl = MIT_URLS[currentServerIndex];
+
+    const response = await axios.get(`${serverUrl}/task-state`, {
       params: {
         taskid: taskId
       }
     });
+
+    if (response.data.state.includes("error")) {
+      console.log({ taskId });
+      console.log(response.data);
+    }
 
     res.json(response.data);
   } catch (err) {
@@ -129,7 +147,9 @@ app.get("/result/:taskId", async (req, res) => {
   const { taskId } = req.params;
 
   try {
-    const response = await axios.get(`${MIT_URL}/result/${taskId}`, {
+    const serverUrl = MIT_URLS[0];
+
+    const response = await axios.get(`${serverUrl}/result/${taskId}`, {
       responseType: "arraybuffer"
     });
 
@@ -147,7 +167,9 @@ app.get("/input/:taskId", async (req, res) => {
   const { taskId } = req.params;
 
   try {
-    const response = await axios.get(`${MIT_URL}/input/${taskId}`, {
+    const serverUrl = MIT_URLS[0];
+
+    const response = await axios.get(`${serverUrl}/input/${taskId}`, {
       responseType: "arraybuffer"
     });
 
@@ -162,5 +184,5 @@ app.get("/input/:taskId", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log("Proxy server started http://127.0.0.1:3000");
+  console.log(`Proxy server started http://127.0.0.1:${PORT}`);
 });
